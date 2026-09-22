@@ -427,7 +427,8 @@ export default function Home() {
         return updated;
       });
 
-      const aiResponseToRemember = finalSessionResults[calculatedWinner || selectedModels[0]] || "";
+      const rawAiResponse = finalSessionResults[calculatedWinner || selectedModels[0]] || "";
+      const aiResponseToRemember = rawAiResponse.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, '').trim();
       const newContextAppend = `User: ${currentPrompt}\nAI: ${aiResponseToRemember}\n\n`;
       
       const newGlobalMemory = (globalMemory + newContextAppend).slice(-4000);
@@ -558,6 +559,50 @@ export default function Home() {
         </span>
       );
     }
+
+    // Check for reasoning / chain-of-thought <think> tags
+    const thinkMatch = text.match(/<think>([\s\S]*?)(?:<\/think>|$)/i);
+    if (thinkMatch) {
+      const thinkingContent = thinkMatch[1].trim();
+      const cleanAnswer = text.replace(/<think>[\s\S]*?(?:<\/think>|$)/i, '').trim();
+
+      return (
+        <div className="space-y-2.5">
+          {thinkingContent && (
+            <details 
+              open={!cleanAnswer}
+              className={`text-xs p-2.5 rounded-xl border transition-all ${
+                isDark ? "bg-white/5 border-white/10 text-white/70" : "bg-black/5 border-violet-200 text-slate-700"
+              }`}
+            >
+              <summary className="cursor-pointer font-medium select-none hover:opacity-80 flex items-center gap-1.5 list-none">
+                <span>💭</span> 
+                <span className="font-semibold tracking-wide">Thought Process</span>
+                {loading && !cleanAnswer ? (
+                  <span className="text-[10px] text-cyan-400 font-mono animate-pulse ml-auto">thinking...</span>
+                ) : (
+                  <span className="text-[10px] opacity-50 font-mono ml-auto">
+                    {thinkingContent.split(/\s+/).filter(Boolean).length} words
+                  </span>
+                )}
+              </summary>
+              <div className="mt-2 pt-2 border-t border-current/10 font-mono text-[11px] leading-relaxed whitespace-pre-wrap opacity-80 max-h-48 overflow-y-auto custom-scrollbar">
+                {thinkingContent}
+              </div>
+            </details>
+          )}
+          {cleanAnswer ? (
+            <div className="whitespace-pre-wrap">{cleanAnswer}</div>
+          ) : loading ? (
+            <span className="flex items-center gap-2 text-xs opacity-60">
+              <span className={`typing-dots ${isDark ? "text-cyan-400" : "text-purple-600"}`}><span /><span /><span /></span>
+              <span>Thinking...</span>
+            </span>
+          ) : null}
+        </div>
+      );
+    }
+
     return text;
   };
 
@@ -576,7 +621,7 @@ export default function Home() {
 
   if (!isAuthenticated) {
     return appShell(
-      <div className={`h-[100dvh] min-h-0 flex flex-col overflow-hidden relative ${bgClass}`}>
+      <div className={`fixed inset-0 flex flex-col overflow-hidden ${bgClass}`}>
         <AuraBackground isDark={isDark} />
 
         <AnimatePresence>
@@ -694,7 +739,7 @@ export default function Home() {
   }
 
   return appShell(
-    <div className={`h-[100dvh] min-h-0 flex flex-col transition-colors duration-500 font-sans overflow-hidden relative ${bgClass}`}>
+    <div className={`fixed inset-0 flex flex-col transition-colors duration-500 font-sans overflow-hidden ${bgClass}`}>
       <AuraBackground isDark={isDark} />
       {/* Profile Modal */}
       <AnimatePresence>
@@ -871,7 +916,7 @@ export default function Home() {
         </div>
       </motion.header>
 
-      <div className="flex-1 flex overflow-hidden w-full relative z-10">
+      <div className="flex-1 flex min-h-0 overflow-hidden w-full relative z-10">
         {/* Mobile sidebar overlay */}
         <AnimatePresence>
           {showHistory && (
@@ -939,7 +984,7 @@ export default function Home() {
           </div>
         </motion.div>
 
-        <main className="flex-1 flex flex-col min-h-0 overflow-hidden w-full">
+        <main className="flex-1 flex flex-col min-h-0 h-full overflow-hidden w-full relative">
           <AnimatePresence mode="wait">
           {!hasProceeded ? (
             <motion.div
@@ -1038,9 +1083,9 @@ export default function Home() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={transitionSmooth}
-              className="flex-1 flex flex-col min-h-0 w-full gpu-smooth"
+              className="flex-1 flex flex-col min-h-0 h-full w-full gpu-smooth"
             >
-              <div className="flex-1 flex flex-col md:flex-row gap-3 md:gap-4 p-3 md:p-5 min-h-0 overflow-hidden">
+              <div className="flex-1 min-h-0 flex flex-col md:flex-row gap-3 md:gap-4 p-2.5 md:p-4 overflow-hidden">
             {selectedModels.map((modelName, colIndex) => {
               const latestTurn = activeTurns[activeTurns.length - 1];
               const isBestOverall = latestTurn?.bestModel === modelName;
@@ -1051,12 +1096,12 @@ export default function Home() {
                   initial={{ opacity: 0, y: 16 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ ...transitionSmooth, delay: colIndex * 0.07 }}
-                  className={`flex-1 flex flex-col h-full min-h-0 rounded-3xl overflow-hidden ${
+                  className={`flex-1 flex flex-col min-h-0 rounded-2xl md:rounded-3xl overflow-hidden ${
                     isDark ? `${cardBgClass} futuristic-panel-dark panel-glow-dark` : `${cardBgClass} futuristic-panel-light panel-glow-light`
                   } ${isBestOverall ? "animate-border-glow border-green-500/60" : ""} ${loading ? (isDark ? "loading-shimmer" : "loading-shimmer loading-shimmer-light") : ""}`}
                 >
-                  <div className={`px-5 py-4 flex justify-between items-center border-b flex-none ${isBestOverall ? "border-green-500/30" : borderClass}`}>
-                    <div className={`flex items-baseline gap-2 font-bold text-lg md:text-xl tracking-tight ${isDark ? "" : "text-gray-900"}`}>
+                  <div className={`px-4 py-3 flex justify-between items-center border-b flex-none ${isBestOverall ? "border-green-500/30" : borderClass}`}>
+                    <div className={`flex items-baseline gap-2 font-bold text-base md:text-lg tracking-tight ${isDark ? "" : "text-gray-900"}`}>
                       {modelName}
                       <span className={`text-xs font-normal tracking-normal ${isDark ? "opacity-40" : "text-gray-500"}`}>({MODEL_VERSIONS[modelName] || "v1.0"})</span>
                     </div>
@@ -1067,7 +1112,7 @@ export default function Home() {
                             initial={{ opacity: 0, scale: 0.8 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.8 }}
-                            className="px-3 py-1 best-badge text-green-400 text-xs font-bold rounded-full"
+                            className="px-2.5 py-0.5 best-badge text-green-400 text-xs font-bold rounded-full"
                           >
                             BEST RESPONSE
                           </motion.span>
@@ -1091,16 +1136,16 @@ export default function Home() {
                     </div>
                   </div>
 
-                  <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-5 chat-scroll-container">
+                  <div className="flex-1 overflow-y-auto custom-scrollbar p-3 md:p-4 chat-scroll-container min-h-0">
                     {activeTurns.map((turn, idx) => (
-                      <div key={idx} className="flex flex-col space-y-3 mb-6">
+                      <div key={idx} className="flex flex-col space-y-3 mb-4">
                         <motion.div
                           initial={{ opacity: 0, x: 16 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ ...transitionFast, delay: 0.05 }}
                           className="flex justify-end w-full"
                         >
-                          <div className={`max-w-[85%] px-4 py-3 rounded-2xl rounded-tr-sm text-[15px] leading-relaxed text-white ${
+                          <div className={`max-w-[85%] px-4 py-2.5 rounded-2xl rounded-tr-sm text-[14px] leading-relaxed text-white ${
                             isDark ? "bubble-user-dark bubble-enter-glow-dark" : "bubble-user-light bubble-enter-glow-light"
                           }`}>
                             {turn.prompt}
@@ -1112,7 +1157,7 @@ export default function Home() {
                           transition={{ ...transitionFast, delay: 0.1 }}
                           className="flex justify-start w-full"
                         >
-                          <div className={`max-w-[95%] px-4 py-3.5 rounded-2xl rounded-tl-sm text-[15px] leading-relaxed whitespace-pre-wrap ${
+                          <div className={`max-w-[95%] px-4 py-3 rounded-2xl rounded-tl-sm text-[14px] leading-relaxed whitespace-pre-wrap ${
                             isDark ? "bubble-ai-dark text-[#f0f0f5]" : "bubble-ai-light"
                           }`}>
                             {renderResponse(turn.results[modelName] || "", modelName)}
@@ -1126,7 +1171,7 @@ export default function Home() {
             })}
               </div>
 
-              <footer className="flex-none px-4 md:px-8 pb-5 pt-2 flex items-end gap-2 md:gap-3 max-w-5xl mx-auto w-full relative z-10">
+              <footer className="flex-none px-3 md:px-6 pb-3 md:pb-4 pt-1 flex items-end gap-2 md:gap-3 max-w-5xl mx-auto w-full relative z-10">
           <motion.button
             whileHover={{ scale: 1.04 }}
             whileTap={{ scale: 0.96 }}
@@ -1134,7 +1179,7 @@ export default function Home() {
             onMouseEnter={() => setIsNewChatHovered(true)}
             onMouseLeave={() => setIsNewChatHovered(false)}
             title="New Chat"
-            className={`h-12 px-4 flex-none flex items-center justify-center gap-2 rounded-2xl font-medium text-sm transition-colors duration-200 ${
+            className={`h-11 px-3.5 flex-none flex items-center justify-center gap-2 rounded-2xl font-medium text-xs md:text-sm transition-colors duration-200 ${
               isDark ? elementBgClass : `${elementBgClass} hover:bg-violet-50/80 text-violet-900`
             }`}
           >
@@ -1147,7 +1192,7 @@ export default function Home() {
             onMouseEnter={() => setIsReportHovered(true)}
             onMouseLeave={() => setIsReportHovered(false)}
             title="Report Analysis"
-            className={`h-12 px-4 flex-none flex items-center justify-center gap-2 rounded-2xl font-medium text-sm border transition-colors duration-200 ${
+            className={`h-11 px-3.5 flex-none flex items-center justify-center gap-2 rounded-2xl font-medium text-xs md:text-sm border transition-colors duration-200 ${
               isDark ? `${elementBgClass} border-purple-500/30 text-purple-400 hover:bg-purple-500/10` : `${elementBgClass} border-violet-300 text-violet-700 hover:bg-violet-50`
             }`}
           >
@@ -1162,11 +1207,11 @@ export default function Home() {
               animate={{ rotate: showModelMenu ? 45 : 0 }}
               transition={{ type: "spring", stiffness: 320, damping: 22 }}
               onClick={() => setShowModelMenu(!showModelMenu)}
-              className={`w-12 h-12 flex items-center justify-center rounded-2xl transition-colors duration-200 ${
+              className={`w-11 h-11 flex items-center justify-center rounded-2xl transition-colors duration-200 ${
                 isDark ? elementBgClass : `${elementBgClass} hover:bg-violet-50/80 text-violet-800`
               }`}
             >
-              <Plus size={22} />
+              <Plus size={20} />
             </motion.button>
             <AnimatePresence>
               {showModelMenu && (
@@ -1210,15 +1255,15 @@ export default function Home() {
               onKeyDown={handleKeyDown}
               placeholder="Enter a prompt here..."
               rows={1}
-              style={{ minHeight: "52px", maxHeight: "200px" }}
-              className={`w-full py-3.5 pl-5 pr-14 bg-transparent focus:outline-none resize-none custom-scrollbar ${isDark ? "placeholder:opacity-40" : "placeholder:text-gray-400 text-gray-900"}`}
+              style={{ minHeight: "46px", maxHeight: "160px" }}
+              className={`w-full py-3 pl-4 pr-12 bg-transparent focus:outline-none resize-none custom-scrollbar text-sm md:text-base ${isDark ? "placeholder:opacity-40" : "placeholder:text-gray-400 text-gray-900"}`}
             />
             <motion.button
               whileHover={{ scale: 1.08 }}
               whileTap={{ scale: 0.92 }}
               onClick={loading ? handleStop : handleSend}
               disabled={(!prompt.trim() && !loading) || selectedModels.length === 0}
-              className={`absolute right-2 bottom-2 p-2.5 rounded-xl transition-colors duration-200 ${
+              className={`absolute right-1.5 bottom-1.5 p-2 rounded-xl transition-colors duration-200 ${
                 loading
                   ? "bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
                   : prompt.trim() && selectedModels.length > 0
@@ -1228,7 +1273,7 @@ export default function Home() {
                     : "opacity-30 cursor-not-allowed"
               }`}
             >
-              {loading ? <Square size={15} className="fill-current" /> : <ArrowUp size={18} />}
+              {loading ? <Square size={14} className="fill-current" /> : <ArrowUp size={16} />}
             </motion.button>
           </div>
               </footer>
